@@ -1,0 +1,5 @@
+[Unit]
+Description=Renew NaturalStreaming HTTPS certificate only
+[Service]
+Type=oneshot
+ExecStart=/opt/videolab-certbot/bin/certbot renew --config-dir /etc/letsencrypt-naturalstreaming --work-dir /srv/naturalstreaming/acme-work --logs-dir /srv/naturalstreaming/acme-logs --quiet --deploy-hook "/usr/sbin/nginx -t && /usr/bin/systemctl reload nginx"

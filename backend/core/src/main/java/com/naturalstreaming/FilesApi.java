@@ -1,0 +1,26 @@
+package com.naturalstreaming;
+import org.springframework.web.bind.annotation.*;import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.http.*;import org.springframework.core.io.*;
+import jakarta.servlet.http.HttpServletRequest;import jakarta.servlet.http.HttpServletResponse;import java.nio.file.*;import java.security.*;import java.util.*;import java.io.*;import java.util.concurrent.Semaphore;import java.util.zip.*;
+@RestController @ConditionalOnProperty(name="ns.role",havingValue="files") public class FilesApi {
+ final Auth auth;final JdbcTemplate db;final MediaStore store;final Catalog catalog;final Semaphore uploads=new Semaphore(2);
+ FilesApi(Auth a,JdbcTemplate d,MediaStore s,Catalog c){auth=a;db=d;store=s;catalog=c;}
+ @PutMapping("/v1/uploads/{sha}") public ResponseEntity<?> upload(HttpServletRequest r,@PathVariable String sha)throws Exception{
+  auth.service(r,"upload");store.path(sha);if(!uploads.tryAcquire())throw ApiError.fail(429,"upload_busy");Path tmp=null;
+  try{tmp=store.temporary();MessageDigest digest=MessageDigest.getInstance("SHA-256");long size=0;try(var in=r.getInputStream();var out=Files.newOutputStream(tmp)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1){size+=n;if(size>134217728)throw ApiError.fail(413,"file_too_large");digest.update(b,0,n);out.write(b,0,n);}}
+   if(!HexFormat.of().formatHex(digest.digest()).equals(sha))throw ApiError.fail(422,"hash_mismatch");var info=store.inspect(tmp);store.install(tmp,sha);tmp=null;
+   db.update("INSERT IGNORE INTO media_file(sha256,bytes,kind,codec,container,channels,sample_rate,duration,mime) VALUES(?,?,?,?,?,?,?,?,?)",sha,size,info.get("kind"),info.get("codec"),info.get("container"),info.get("channels"),info.get("sampleRate"),info.get("duration"),info.get("mime"));
+   Map<String,Object> result=new LinkedHashMap<>(info);result.put("sha256",sha);result.put("bytes",size);return ResponseEntity.status(201).body(result);
+  }finally{if(tmp!=null)Files.deleteIfExists(tmp);uploads.release();}
+ }
+ @GetMapping("/v1/uploads/{sha}") Map<?,?> metadata(HttpServletRequest r,@PathVariable String sha){auth.service(r,"upload");var rows=db.queryForList("SELECT * FROM media_file WHERE sha256=?",sha);if(rows.isEmpty())throw ApiError.fail(404,"file_missing");return rows.getFirst();}
+ @RequestMapping(value="/v1/media/{sha}",method={RequestMethod.GET,RequestMethod.HEAD}) ResponseEntity<Resource> download(HttpServletRequest r,@PathVariable String sha,@RequestParam String ticket){
+  var u=auth.user(r);Map<String,Object> t;try{t=Json.read(catalog.unseal(ticket,"invalid_ticket"));}catch(ApiError e){throw ApiError.fail(403,"invalid_ticket");}
+  if(Json.num(t.get("expires"))<System.currentTimeMillis()/1000)throw ApiError.fail(403,"download_expired");if(Json.num(t.get("account"))!=u.id()||!u.tokenHash().equals(t.get("tokenHash"))||!sha.equals(t.get("sha256")))throw ApiError.fail(403,"ticket_session_mismatch");
+  auth.entitled(u,Json.text(t,"theme"));var version=catalog.version(Json.text(t,"theme"),Json.text(t,"version"),true);boolean bound=Json.objects(Json.read((String)version.get("manifest_json")).get("files")).stream().anyMatch(f->sha.equals(f.get("sha256"))&&t.get("path").equals(f.get("path")));if(!bound)throw ApiError.fail(403,"invalid_ticket");
+  var rows=db.queryForList("SELECT mime,bytes FROM media_file WHERE sha256=?",sha);Path p=store.path(sha);if(rows.isEmpty()||!Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS))throw ApiError.fail(404,"file_missing");return ResponseEntity.ok().header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").eTag("\""+sha+"\"").contentType(MediaType.parseMediaType((String)rows.getFirst().get("mime"))).body(new FileSystemResource(p));
+ }
+ @GetMapping("/v1/exports/{theme}/{version}") public void export(HttpServletRequest r,HttpServletResponse response,@PathVariable String theme,@PathVariable String version)throws Exception{
+  auth.service(r,"upload");if(!ThemeValidator.id(theme)||!ThemeValidator.id(version))throw ApiError.fail(400,"invalid_id");var v=catalog.version(theme,version,false);var manifest=Json.read((String)v.get("manifest_json"));var entries=Json.objects(manifest.get("files"));Set<String> paths=new HashSet<>();for(var e:entries)if(!ThemeValidator.safePath(Json.text(e,"path"))||!paths.add(Json.text(e,"path"))||!Files.isRegularFile(store.path(Json.text(e,"sha256"))))throw ApiError.fail(409,"export_not_ready");
+  response.setContentType("application/zip");response.setHeader("Cache-Control","no-store");response.setHeader("Content-Disposition","attachment; filename=\""+theme+"-"+version+".zip\"");try(ZipOutputStream z=new ZipOutputStream(response.getOutputStream())){for(String name:List.of("scene","manifest")){ZipEntry e=new ZipEntry(name+".json");e.setTime(0);z.putNextEntry(e);z.write(((String)v.get(name+"_json")).getBytes(java.nio.charset.StandardCharsets.UTF_8));z.closeEntry();}for(var f:entries){ZipEntry e=new ZipEntry(Json.text(f,"path"));e.setTime(0);z.putNextEntry(e);Files.copy(store.path(Json.text(f,"sha256")),z);z.closeEntry();}}
+ }
+}
