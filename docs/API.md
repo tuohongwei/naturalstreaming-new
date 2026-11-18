@@ -1,6 +1,6 @@
 # NaturalStreaming 前端接口对接
 
-契约版本 1.0，Android 包名 `com.naturalstreaming`。本项目后端采用独立账号，不能使用 SayTavi 账号。产品范围见 requirements-v1.0.md（内容修订 1.1）。
+契约版本 1.0，iOS 优先，跨端接口一致；Android 后续包名 `com.naturalstreaming`。本项目后端采用独立账号，不能使用 SayTavi 账号。产品范围见 requirements-v1.0.md（内容修订 1.2）。
 
 ## 地址与凭证
 

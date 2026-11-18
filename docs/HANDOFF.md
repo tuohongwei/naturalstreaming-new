@@ -1,10 +1,10 @@
 # NaturalStreaming 前端 Codex 交接
 
-首版 Android 包名及 namespace 均为 `com.naturalstreaming`。只做手动混音、现有预设、下载与离线播放，地图/电台/AI/语音注册后续开发。
+首版现为 iOS 优先；Android 后续包名及 namespace 均为 `com.naturalstreaming`。只做手动混音、现有预设、下载与离线播放，地图/电台/AI/语音注册后续开发。
 
 ## 先读
 
-1. `docs/requirements-v1.0.md`：完整已确认需求，文件名固定，内容修订 1.1。
+1. `docs/requirements-v1.0.md`：完整已确认需求，文件名固定，内容修订 1.2。
 2. `docs/API.md`：已部署地址、全部接口、请求响应、权限和错误处理。
 3. `docs/PLAYBACK.md`：A/B 直接叠加、2秒预设过渡、动态增益、输出保护、定时和生命周期。
 
@@ -57,3 +57,6 @@ $env:NS_CREDENTIALS_FILE='C:/Users/Administrator/Desktop/projects/NaturalStreami
 - 新配置准备成功后才切换；播放器只读本地文件。
 - App 重开恢复配置但不自动播放；来电等中断结束也不自动恢复。
 - upload 凭证只能在开发工具使用，严禁打包进 App。
+
+
+2026-11-18 更新：用户已批准 iOS 优先；测试账号新增 coastal-home、tender-piano 授权。平台接入说明见前端仓库 docs/BACKEND-IOS-AUTHORIZATION-2026-11-18.md，历史 Android 首版描述以此更新为准。
