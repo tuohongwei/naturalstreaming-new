@@ -1,6 +1,6 @@
 # NaturalStreaming 前端接口对接
 
-契约版本 1.0，iOS 优先，跨端接口一致；Android 后续包名 `com.naturalstreaming`。本项目后端采用独立账号，不能使用 SayTavi 账号。产品范围见 requirements-v1.0.md（内容修订 1.2）。
+契约版本 1.0，iOS 优先，跨端接口一致；Android 后续包名 `com.naturalstreaming`。本项目后端采用独立账号，不能使用 SayTavi 账号。产品范围见 requirements-v1.0.md（内容修订 1.3）。
 
 ## 地址与凭证
 
@@ -171,3 +171,10 @@ details 可为列表、字符串或对象，客户端依赖 code 而非文本。
 ## 本地播放交接
 
 详见 PLAYBACK.md。后端不执行混音、定时器或系统音频焦点。接口通过不能替代真机离线、A/B 接缝和锁屏续播验收。
+
+
+## 可视化后台增补 2026-11-19
+
+https://admin.naturalstreaming.net 提供独立管理员会话界面，详见 ADMIN-WEB.md。/console/login、/console/session、/console/logout、/console/password 使用 Secure HttpOnly Cookie，不使用 App token。/console/api 为同源固定路由网关，写请求需要 Origin 和 X-CSRF-Token；不向浏览器发送服务凭证，不开放凭证管理。
+
+既有服务接口兼容不变。POST 版本 validate/publish 可选传 `{ "revision": 当前修订整数 }`，在版本锁内比较，冲突返回 409 revision_conflict；网页网关强制校验和发布都携带 revision。新增 GET admin `/v1/admin/accounts/{id}/themes`（accounts scope）读取完整授权，GET admin `/v1/admin/audit`（publish scope）读取最近100条记录；GET/HEAD media `/v1/uploads/{sha}/content`（upload scope）提供需认证的媒体试听/封面和Range，不对App匿名公开。

@@ -4,6 +4,7 @@ Java 26 / Spring Boot 4 / MySQL backend for local theme-based background-audio m
 
 - Requirements: [docs/requirements-v1.0.md](docs/requirements-v1.0.md)
 - Frontend handoff: [docs/HANDOFF.md](docs/HANDOFF.md)
+- Visual admin: [docs/ADMIN-WEB.md](docs/ADMIN-WEB.md) at https://admin.naturalstreaming.net
 - API contract: [docs/API.md](docs/API.md)
 - Playback contract: [docs/PLAYBACK.md](docs/PLAYBACK.md)
 - Deployment and isolation: [docs/OPERATIONS.md](docs/OPERATIONS.md)

@@ -19,7 +19,7 @@
 
 `ops/server.py provision` 仅用于首次建立，遇已有项目目录、schema、账号或占用端口即拒绝。不重复初始化，不修改 SayTavi、AiChef、CRM 或其他数据库与服务。不改用户主目录、SSH、祖先目录或无关 ACL。
 
-provision 保存无关 Nginx 配置哈希和现有应用 MainPID 到 baseline.json；`server.py verify` 独立核对。若其他项目在此后自行升级，先核实变更归属，不能为了让验证通过静默覆盖基线。
+provision 保存无关 Nginx 配置哈希和现有应用 MainPID 到 baseline.json；后续每次 deploy 保存新的 per-release 基线，`server.py verify <该基线路径>` 独立核对，首次记录保留。若其他项目在此后自行升级，先核实变更归属，不能为了让验证通过静默覆盖基线。
 
 ## 构建与升级
 
@@ -71,3 +71,6 @@ python ops/test_e2e.py
 ## 验证边界
 
 后端回归证明接口与数据行为，不证明 Android 真机音质、前台服务、音频焦点、锁屏或断网播放。这些由前端按 PLAYBACK.md 验收。
+
+
+可视化后台已加入，管理员会话、引导配置和操作说明见 ADMIN-WEB.md。网页随 admin JAR 发布，admin.naturalstreaming.net 不再显示占位文本。

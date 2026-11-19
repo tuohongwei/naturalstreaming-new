@@ -110,17 +110,19 @@ def nginx(https=False):
  body+='server { listen 80; server_name '+' '.join(HOSTS)+'; '+acme+' location / { '+('return 301 https://$host$request_uri;' if https else 'return 503;')+' } }\n'
  if https:
   cert='/etc/letsencrypt-naturalstreaming/live/naturalstreaming.net'
-  for host,port in [('api.naturalstreaming.net',8190),('admin-api.naturalstreaming.net',8191),('media.naturalstreaming.net',8192)]:
+  for host,port in [('api.naturalstreaming.net',8190),('admin-api.naturalstreaming.net',8191),('media.naturalstreaming.net',8192),('admin.naturalstreaming.net',8191)]:
    body+=f'''server {{ listen 443 ssl; server_name {host};
  ssl_certificate {cert}/fullchain.pem; ssl_certificate_key {cert}/privkey.pem;
  client_max_body_size 1m; client_body_timeout 120s;
  add_header X-Content-Type-Options nosniff always;
+ location = /console/login {{ limit_req zone=ns_login burst=5 nodelay; limit_req_status 429; proxy_pass http://127.0.0.1:{port}; proxy_set_header Host $host; }}
+ location ^~ /console/api/uploads/ {{ client_max_body_size 128m; proxy_pass http://127.0.0.1:{port}; proxy_set_header Host $host; proxy_read_timeout 180s; proxy_send_timeout 180s; proxy_buffering off; access_log off; }}
  location = /v1/auth/login {{ limit_req zone=ns_login burst=5 nodelay; limit_req_status 429; proxy_pass http://127.0.0.1:{port}; proxy_set_header Host $host; }}
  location ^~ /v1/uploads/ {{ client_max_body_size 128m; proxy_pass http://127.0.0.1:{port}; proxy_set_header Host $host; proxy_read_timeout 180s; proxy_send_timeout 180s; proxy_buffering off; access_log off; }}
  location / {{ proxy_pass http://127.0.0.1:{port}; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto https; proxy_read_timeout 180s; proxy_send_timeout 180s; proxy_buffering off; proxy_request_buffering on; access_log off; }}
 }}
 '''
-  body+=f'''server {{ listen 443 ssl; server_name naturalstreaming.net www.naturalstreaming.net admin.naturalstreaming.net;
+  body+=f'''server {{ listen 443 ssl; server_name naturalstreaming.net www.naturalstreaming.net;
 ssl_certificate {cert}/fullchain.pem; ssl_certificate_key {cert}/privkey.pem;
 location / {{ default_type text/plain; return 200 "NaturalStreaming development backend. App and admin web pages are not published yet.\\n"; }}
 }}
@@ -132,12 +134,18 @@ location / {{ default_type text/plain; return 200 "NaturalStreaming development 
   else:NG.write_bytes(old)
   raise
  run('systemctl','reload','nginx')
-def verify():
- before=json.loads((CONF/'baseline.json').read_text());assert before['nginx']==hashes(),'Unrelated nginx configuration changed'
+def snapshot_path(value):
+ p=Path(value);assert p.resolve().is_relative_to(BASE/'backups') and not p.is_symlink();return p
+def capture(value):
+ p=snapshot_path(value);secure(p,json.dumps(baseline()));print('Captured current deployment baseline:',p)
+def verify(value=None):
+ before=json.loads((snapshot_path(value) if value else CONF/'baseline.json').read_text());assert before['nginx']==hashes(),'Unrelated nginx configuration changed'
  for unit,pid in before['units'].items():
   current=run('systemctl','show',unit,'-p','MainPID','--value',capture_output=True,text=True).stdout.strip()
   assert current==pid,(unit,'PID changed',pid,current)
   run('systemctl','is-active','--quiet',unit)
  print('Unrelated virtual hosts unchanged; existing application service PIDs unchanged and active')
 if __name__=='__main__':
- {'provision':provision,'start':start,'http':lambda:nginx(False),'https':lambda:nginx(True),'verify':verify}[sys.argv[1]]()
+ if sys.argv[1]=='capture':capture(sys.argv[2])
+ elif sys.argv[1]=='verify':verify(sys.argv[2] if len(sys.argv)>2 else None)
+ else:{'provision':provision,'start':start,'http':lambda:nginx(False),'https':lambda:nginx(True)}[sys.argv[1]]()

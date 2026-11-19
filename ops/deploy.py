@@ -21,6 +21,8 @@ def main():
 import subprocess
 base=pathlib.Path('/srv/naturalstreaming');stage=pathlib.Path('{stage}');target=base/'releases'/'{release}'
 assert base.is_dir() and not base.is_symlink()
+baseline=base/'backups'/'baseline-{release}.json'
+subprocess.run(['python3',str(stage/'server.py'),'capture',str(baseline)],check=True)
 manifest=json.loads({json.dumps(json.dumps(manifest))})
 for name,want in manifest.items():
  p=stage/name
@@ -43,7 +45,7 @@ except subprocess.CalledProcessError:
  rollback.symlink_to(previous);rollback.replace(current)
  for role in ['api','admin','files']:subprocess.run(['systemctl','restart','naturalstreaming-'+role],check=True)
  raise
-subprocess.run(['python3',str(stage/'server.py'),'verify'],check=True)
+subprocess.run(['python3',str(stage/'server.py'),'verify',str(baseline)],check=True)
 '''
  local=root/'.local'/'install-release.py';local.parent.mkdir(exist_ok=True);local.write_text(script)
  copy([local],stage+'/install.py')
