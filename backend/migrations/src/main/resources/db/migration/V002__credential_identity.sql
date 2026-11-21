@@ -1,1 +1,0 @@
-ALTER TABLE service_credential MODIFY id VARCHAR(80) CHARACTER SET ascii COLLATE ascii_bin NOT NULL;

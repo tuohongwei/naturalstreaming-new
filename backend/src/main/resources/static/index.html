@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>NaturalStreaming 管理后台</title>
+  <link rel="stylesheet" href="/phase1-console.css">
+  <script src="/phase1-console.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">NaturalStreaming <span>管理后台</span></div>
+    <button id="logout" class="secondary" type="button" hidden>退出登录</button>
+  </header>
+  <main>
+    <section id="login-panel" class="panel login-panel" aria-labelledby="login-title">
+      <h1 id="login-title">管理员登录</h1>
+      <form id="login-form">
+        <label>用户名 <input name="username" autocomplete="username" required></label>
+        <label>密码 <input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">登录</button>
+      </form>
+    </section>
+
+    <div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
+    <div id="workspace" hidden>
+      <nav aria-label="管理菜单">
+        <a href="#assets-panel">素材库</a>
+        <a href="#themes-panel">主题</a>
+        <a href="#presets-panel">预设</a>
+      </nav>
+      <section id="assets-panel" class="panel" aria-labelledby="assets-title">
+        <div class="section-heading">
+          <h1 id="assets-title">素材库</h1>
+          <button id="export-assets" class="secondary" type="button">导出素材目录</button>
+        </div>
+        <form id="asset-import" class="inline-form">
+          <label>音频素材 ZIP <input name="file" type="file" accept=".zip,application/zip" required></label>
+          <button type="submit">批量导入</button>
+        </form>
+        <p class="hint">将音频和对应的同名说明 JSON 一起上传。导出的目录可以交给 Codex 编写预设。</p>
+        <details id="import-result" hidden>
+          <summary>导入结果</summary>
+          <pre id="import-detail"></pre>
+        </details>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">音频</th><th scope="col">素材 ID</th><th scope="col">操作</th></tr></thead>
+            <tbody id="asset-list"></tbody>
+          </table>
+        </div>
+        <audio id="asset-player" controls hidden></audio>
+      </section>
+
+      <section id="themes-panel" class="panel" aria-labelledby="themes-title">
+        <h2 id="themes-title">主题</h2>
+        <form id="theme-create" class="inline-form">
+          <label>主题 ID <input name="id" placeholder="coastal-home" required></label>
+          <label>主题名称 <input name="name" placeholder="海岸的家" required></label>
+          <button type="submit">创建主题</button>
+        </form>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">主题名称</th><th scope="col">主题 ID</th></tr></thead>
+            <tbody id="theme-list"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="presets-panel" class="panel" aria-labelledby="presets-title">
+        <h2 id="presets-title">预设</h2>
+        <form id="preset-import" class="inline-form">
+          <label>播放预设 JSON <input name="file" type="file" accept=".json,application/json" required></label>
+          <button type="submit">导入草稿</button>
+        </form>
+        <p class="hint">每个场景、天气和功能的组合对应一个当前发布版本。导入后先试听，再选择版本发布。</p>
+        <div id="preview-controls" class="preview" hidden>
+          <span id="preview-label" role="status" aria-live="polite"></span>
+          <button id="stop-preview" type="button" class="secondary">停止试听</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">预设</th><th scope="col">场景 · 天气 · 功能</th><th scope="col">版本</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
+            <tbody id="preset-list"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <dialog id="json-dialog" aria-labelledby="json-title">
+    <div class="section-heading">
+      <h2 id="json-title">JSON</h2>
+      <form method="dialog"><button class="secondary">关闭</button></form>
+    </div>
+    <pre id="json-content"></pre>
+  </dialog>
+</body>
+</html>
