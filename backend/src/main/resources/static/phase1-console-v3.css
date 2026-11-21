@@ -109,3 +109,24 @@ main { max-width: 1360px; }
   .sidebar nav { display: flex; flex-wrap: wrap; gap: .35rem; }
   .sidebar nav p { display: none; }
 }
+
+.sidebar { padding: .85rem .65rem; background: #15342c; border-color: #15342c; box-shadow: 0 8px 24px #193c2912; }
+.sidebar nav { gap: .23rem; }
+.sidebar nav p { color: #a6c3b5; font-size: .74rem; letter-spacing: .09em; margin: .9rem .75rem .25rem; }
+.sidebar nav a { display: flex; gap: .7rem; align-items: center; padding: .65rem .75rem; color: #e6f0ea; border-left: 0; min-height: 42px; }
+.sidebar nav a:hover { background: #284a3d; }
+.sidebar nav a[aria-current="page"] { background: #375d4d; color: #fff; box-shadow: inset 3px 0 #a6d3bb; }
+.nav-icon { position: relative; display: inline-block; flex: 0 0 14px; height: 14px; border: 1.5px solid currentColor; opacity: .9; }
+.nav-asset { border-radius: 3px; }
+.nav-asset::after { content: ""; position: absolute; inset: 3px 5px; background: currentColor; }
+.nav-theme { border-radius: 3px; height: 11px; margin-top: 3px; }
+.nav-theme::before { content: ""; position: absolute; width: 6px; height: 3px; border: 1.5px solid currentColor; border-bottom: 0; border-radius: 2px 2px 0 0; top: -5px; left: -1.5px; }
+.nav-member { border-radius: 50%; height: 14px; }
+.nav-account { border-radius: 2px; }
+.nav-account::after { content: ""; position: absolute; inset: 3px 2px 4px; border-bottom: 1.5px solid currentColor; }
+.nav-role { border-radius: 6px 6px 8px 8px; }
+.theme-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; color: var(--muted); margin-bottom: 1rem; }
+.theme-breadcrumb button { padding: .3rem .55rem; }
+@media (max-width: 760px) {
+  .sidebar nav a { padding: .45rem .62rem; min-height: 36px; gap: .45rem; }
+}

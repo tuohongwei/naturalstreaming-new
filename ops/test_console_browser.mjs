@@ -83,7 +83,12 @@ try {
     await until(() => evaluate('document.querySelector("#edit-dialog").open'), 'password dialog')
     assert.equal(await evaluate('document.querySelector("#edit-title").textContent'), '修改密码')
     await evaluate('document.querySelector("#edit-dialog").close()')
-    await evaluate('document.querySelector("a[href=\'#presets-panel\']").click()')
+    await openPanel('themes-panel','theme-list','海岸的家')
+    await evaluate(`[...document.querySelectorAll("#theme-list tr")].find(row => row.innerText.includes("柔软的钢琴")).querySelector("button").click()`)
+    await until(() => evaluate('document.querySelector("#preset-list").innerText.length > 0'), 'empty theme preview list')
+    assert.equal(await evaluate('document.querySelector("#preset-list").innerText.includes("coastal-home")'),false)
+    await evaluate('document.querySelector("#return-to-themes").click()')
+    await evaluate(`[...document.querySelectorAll("#theme-list tr")].find(row => row.innerText.includes("海岸的家")).querySelector("button").click()`)
     await until(() => evaluate('document.querySelector("#preset-list").innerText.includes("coastal-home-light-rain-study")'), 'current preset list')
     await evaluate(`(() => {
         const row = [...document.querySelectorAll("#preset-list tr")].find(x =>

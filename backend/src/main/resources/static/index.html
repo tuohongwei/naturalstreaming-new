@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>NaturalStreaming 管理后台</title>
-  <link rel="stylesheet" href="/phase1-console-v2.css">
-  <script src="/phase1-console-v2.js" defer></script>
+  <link rel="stylesheet" href="/phase1-console-v3.css">
+  <script src="/phase1-console-v3.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -34,14 +34,13 @@
       <aside class="sidebar">
         <nav aria-label="管理菜单">
           <p id="content-nav-heading">内容管理</p>
-          <a href="#assets-panel" data-permission="assets.read">素材库</a>
-          <a href="#themes-panel" data-permission="themes.read">主题</a>
-          <a href="#presets-panel" data-permission="presets.read">预设</a>
+          <a href="#assets-panel" data-permission="assets.read"><span class="nav-icon nav-asset" aria-hidden="true"></span>素材库</a>
+          <a href="#themes-panel" id="themes-link"><span class="nav-icon nav-theme" aria-hidden="true"></span>主题管理</a>
           <p id="members-nav-heading">用户管理</p>
-          <a href="#members-panel" data-permission="members.manage">会员管理</a>
+          <a href="#members-panel" data-permission="members.manage"><span class="nav-icon nav-member" aria-hidden="true"></span>会员管理</a>
           <p id="system-nav-heading">系统管理</p>
-          <a href="#accounts-panel" data-permission="accounts.manage">后台账号</a>
-          <a href="#roles-panel" data-permission="roles.manage">角色管理</a>
+          <a href="#accounts-panel" data-permission="accounts.manage"><span class="nav-icon nav-account" aria-hidden="true"></span>后台账号</a>
+          <a href="#roles-panel" data-permission="roles.manage"><span class="nav-icon nav-role" aria-hidden="true"></span>角色管理</a>
         </nav>
       </aside>
       <div class="module-content">
@@ -69,7 +68,8 @@
       </section>
 
       <section id="themes-panel" class="panel" aria-labelledby="themes-title">
-        <h2 id="themes-title">主题</h2>
+        <div id="theme-overview">
+        <h2 id="themes-title">主题管理</h2>
         <form id="theme-create" data-permission="themes.write" class="inline-form">
           <label>主题 ID <input name="id" placeholder="coastal-home" required></label>
           <label>主题名称 <input name="name" placeholder="海岸的家" required></label>
@@ -77,14 +77,14 @@
         </form>
         <div class="table-wrap">
           <table>
-            <thead><tr><th scope="col">主题名称</th><th scope="col">主题 ID</th></tr></thead>
+            <thead><tr><th scope="col">主题名称</th><th scope="col">主题 ID</th><th scope="col">操作</th></tr></thead>
             <tbody id="theme-list"></tbody>
           </table>
         </div>
-      </section>
-
-      <section id="presets-panel" class="panel" aria-labelledby="presets-title">
-        <h2 id="presets-title">预设</h2>
+        </div>
+        <section id="presets-panel" aria-labelledby="presets-title" hidden>
+          <div class="theme-breadcrumb"><button id="return-to-themes" class="secondary" type="button">主题管理</button><span aria-hidden="true">/</span><span id="theme-detail-name"></span></div>
+          <h2 id="presets-title">主题预设</h2>
         <form id="preset-import" data-permission="presets.write" class="inline-form">
           <label>播放预设 JSON <input name="file" type="file" accept=".json,application/json" required></label>
           <button type="submit">导入草稿</button>
@@ -96,10 +96,11 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th scope="col">预设</th><th scope="col">场景 · 天气 · 功能</th><th scope="col">版本</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
+            <thead><tr><th scope="col">预设</th><th scope="col">天气 · 功能</th><th scope="col">版本</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
             <tbody id="preset-list"></tbody>
           </table>
         </div>
+      </section>
       </section>
         <section id="members-panel" class="panel" aria-labelledby="members-title" hidden>
           <div class="section-heading">

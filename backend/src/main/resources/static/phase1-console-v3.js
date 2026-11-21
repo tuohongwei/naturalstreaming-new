@@ -1,7 +1,7 @@
 "use strict";
 
 const byId = (id) => document.getElementById(id);
-const state = { assets: [], signedIn: false, preview: null, permissions: new Set(), panel: null };
+const state = { assets: [], signedIn: false, preview: null, permissions: new Set(), panel: null, theme: null };
 const loginForm = byId("login-form");
 const assetPlayer = byId("asset-player");
 const feedback = byId("feedback");
@@ -58,6 +58,7 @@ function setSignedIn(signedIn) {
   byId("account-menu").hidden = !signedIn;
   if (signedIn) return;
   state.assets = [];
+  state.theme = null;
   state.permissions.clear();
   state.panel = null;
   byId("account-menu").open = false;
@@ -205,7 +206,7 @@ function renderPresets(presets) {
     }, ""));
     return [
       preset.preset_id,
-      [target.scene_id, target.weather_id, target.function_id].filter(Boolean).join(" · "),
+      [target.weather_id, target.function_id].filter(Boolean).join(" · "),
       preset.revision,
       current ? "当前发布" : published ? "历史发布" : "草稿",
       actions(...controls)
@@ -218,14 +219,47 @@ async function refreshAssets() {
   renderAssets();
 }
 
+function showThemeList() {
+  state.theme = null;
+  stopPreview();
+  byId("theme-overview").hidden = false;
+  byId("presets-panel").hidden = true;
+  byId("preset-import").reset();
+}
+
 async function refreshThemes() {
-  const themes = items(await api("/admin/themes"), "themes");
-  renderRows("theme-list", themes, (theme) => [theme.name, theme.id ?? theme.theme_id ?? theme.scene_id], 2);
+  showThemeList();
+  const themes = can("themes.read")
+    ? items(await api("/admin/themes"), "themes")
+    : Array.from(new Set(items(await api("/admin/presets"), "presets")
+        .map((preset) => presetOf(preset).target.scene_id))).map((id) => ({ id, name: id }));
+  renderRows("theme-list", themes, (theme) => [
+    theme.name, theme.id, can("presets.read")
+      ? makeButton("管理预设", async () => {
+          state.theme = theme;
+          byId("theme-detail-name").textContent = theme.name;
+          byId("theme-overview").hidden = true;
+          byId("presets-panel").hidden = false;
+          byId("preset-list").replaceChildren();
+          await refreshPresets();
+        })
+      : "—"
+  ], 3);
 }
 
 async function refreshPresets() {
-  renderPresets(items(await api("/admin/presets"), "presets"));
+  const theme = state.theme;
+  if (!theme) return;
+  const presets = items(await api("/admin/presets"), "presets");
+  if (state.theme === theme) {
+    renderPresets(presets.filter((preset) => presetOf(preset).target.scene_id === theme.id));
+  }
 }
+
+byId("return-to-themes").addEventListener("click", () => {
+  showThemeList();
+  report("");
+});
 
 const permissionLabels = {
   "assets.read": "查看、试听和导出素材",
@@ -243,7 +277,6 @@ const permissionLabels = {
 const navigation = [
   ["assets-panel", refreshAssets],
   ["themes-panel", refreshThemes],
-  ["presets-panel", refreshPresets],
   ["members-panel", refreshMembers],
   ["accounts-panel", refreshAccounts],
   ["roles-panel", refreshRoles]
@@ -278,6 +311,7 @@ async function loadWorkspace() {
   for (const element of document.querySelectorAll("[data-permission]")) {
     element.hidden = !can(element.dataset.permission);
   }
+  byId("themes-link").hidden = !can("themes.read") && !can("presets.read");
   byId("content-nav-heading").hidden = !["assets.read", "themes.read", "presets.read"].some(can);
   byId("members-nav-heading").hidden = !can("members.manage");
   byId("system-nav-heading").hidden = !can("accounts.manage") && !can("roles.manage");
@@ -331,11 +365,15 @@ onSubmit(byId("theme-create"), async (body) => {
 });
 
 onSubmit(byId("preset-import"), async (body) => {
+  const theme = state.theme;
   let preset;
   try {
     preset = JSON.parse((await body.get("file").text()).replace(/^\uFEFF/, ""));
   } catch (_) {
     throw new Error("预设文件的 JSON 格式有误");
+  }
+  if (!theme || preset?.target?.scene_id !== theme.id) {
+    throw new Error("预设场景 ID 必须与当前主题一致：" + (theme?.id ?? ""));
   }
   await api("/admin/presets", sendJson("POST", preset));
   await refreshPresets();
