@@ -11,7 +11,7 @@ if (!existsSync(accountPath)) {
     writeFileSync(accountPath, JSON.stringify(account, null, 2) + '\n', {flag:'wx', mode:0o600})
 }
 const account = JSON.parse(readFileSync(accountPath))
-if (!/^[a-z0-9-]+$/.test(account.username) || !/^[A-Za-z0-9_-]{32}$/.test(account.password)) {
+if (!/^[a-z0-9-]+$/.test(account.username) || !/^[A-Za-z0-9_-]{9,72}$/.test(account.password)) {
     throw new Error('Invalid bootstrap account format')
 }
 

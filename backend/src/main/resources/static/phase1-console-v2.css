@@ -79,3 +79,33 @@ audio { margin-top: .85rem; max-width: 100%; }
   .panel { padding: .85rem; }
   th, td { padding: .5rem; }
 }
+
+.topbar { position: sticky; top: 0; z-index: 2; padding-inline: max(1.25rem, calc((100vw - 1320px) / 2)); }
+main { max-width: 1360px; }
+#workspace { display: grid; grid-template-columns: 202px minmax(0, 1fr); align-items: start; gap: 1.25rem; }
+.module-content { min-width: 0; }
+.sidebar { position: sticky; top: 4.7rem; padding: .8rem; background: #fff; border: 1px solid var(--line); border-radius: .85rem; }
+.sidebar nav { display: grid; gap: .25rem; margin: 0; }
+.sidebar nav p { margin: .7rem .65rem .15rem; color: var(--muted); font-size: .82rem; font-weight: 650; }
+.sidebar nav p:first-child { margin-top: .1rem; }
+.sidebar nav a { display: block; background: transparent; border-left: 3px solid transparent; font-weight: 550; padding: .56rem .65rem; }
+.sidebar nav a:hover { background: #f0f6f0; }
+.sidebar nav a[aria-current="page"] { border-left-color: var(--accent); background: #deeee4; font-weight: 720; }
+.account-menu { position: relative; margin: 0; }
+.account-menu summary { padding: .25rem .55rem; }
+.account-actions { position: absolute; right: 0; top: calc(100% + .5rem); display: grid; gap: .4rem; min-width: 9rem; padding: .5rem; border: 1px solid var(--line); border-radius: .6rem; background: #fff; box-shadow: 0 5px 18px #173a3022; }
+.account-actions button { white-space: nowrap; }
+.stack-form { display: grid; gap: .8rem; }
+.stack-form button { justify-self: start; }
+.stack-form select { font: inherit; background: #fff; border: 1px solid #bfcfc2; border-radius: .45rem; color: inherit; padding: .44rem .6rem; }
+.permissions { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .55rem; padding: .8rem; border: 1px solid var(--line); border-radius: .45rem; }
+.permissions label { display: flex; gap: .4rem; align-items: start; }
+.permissions input { accent-color: var(--accent); }
+#edit-dialog { padding: 1.2rem; width: min(535px, 92vw); }
+#edit-dialog .feedback { margin-top: 0; }
+@media (max-width: 760px) {
+  #workspace { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  .sidebar { position: static; }
+  .sidebar nav { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .sidebar nav p { display: none; }
+}

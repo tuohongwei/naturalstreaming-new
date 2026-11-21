@@ -64,6 +64,26 @@ try {
         password.value = ${JSON.stringify(admin.password)};
         form.requestSubmit();
     })()`)
+    await until(async () => {
+        const status = await evaluate(`({
+            ready: !document.querySelector("#account-menu").hidden,
+            error: document.querySelector(".error:not([hidden])")?.textContent,
+        })`)
+        if (status.error) throw new Error(status.error)
+        return status.ready
+    }, 'sidebar workspace')
+    async function openPanel(panel, list, expected) {
+        await evaluate(`document.querySelector('a[href="#${panel}"]').click()`)
+        await until(() => evaluate(`document.querySelector('#${list}').innerText.includes(${JSON.stringify(expected)})`), panel)
+    }
+    await openPanel('members-panel','member-list','naturalstreaming-phase1')
+    await openPanel('accounts-panel','account-list',admin.username)
+    await openPanel('roles-panel','role-list','超级管理员')
+    await evaluate('document.querySelector("#account-menu").open=true; document.querySelector("#open-password").click()')
+    await until(() => evaluate('document.querySelector("#edit-dialog").open'), 'password dialog')
+    assert.equal(await evaluate('document.querySelector("#edit-title").textContent'), '修改密码')
+    await evaluate('document.querySelector("#edit-dialog").close()')
+    await evaluate('document.querySelector("a[href=\'#presets-panel\']").click()')
     await until(() => evaluate('document.querySelector("#preset-list").innerText.includes("coastal-home-light-rain-study")'), 'current preset list')
     await evaluate(`(() => {
         const row = [...document.querySelectorAll("#preset-list tr")].find(x =>

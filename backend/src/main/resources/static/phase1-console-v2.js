@@ -1,7 +1,7 @@
 "use strict";
 
 const byId = (id) => document.getElementById(id);
-const state = { assets: [], signedIn: false, preview: null };
+const state = { assets: [], signedIn: false, preview: null, permissions: new Set(), panel: null };
 const loginForm = byId("login-form");
 const assetPlayer = byId("asset-player");
 const feedback = byId("feedback");
@@ -16,8 +16,9 @@ async function request(path, options = {}) {
   const response = await fetch(path, { ...options, credentials: "same-origin" });
   if (!response.ok) {
     const failure = await response.json().catch(() => null);
-    if (response.status === 401 && state.signedIn) setSignedIn(false);
     const reason = failure?.message ?? failure?.detail ?? failure?.error ?? failure?.code;
+    const badPassword = reason === "invalid_credentials" || reason === "invalid_current_password";
+    if (response.status === 401 && state.signedIn && !badPassword) setSignedIn(false);
     const error = new Error(typeof reason === "string" ? reason : "请求失败（HTTP " + response.status + "）");
     error.status = response.status;
     throw error;
@@ -54,12 +55,17 @@ function setSignedIn(signedIn) {
   state.signedIn = signedIn;
   byId("login-panel").hidden = signedIn;
   byId("workspace").hidden = !signedIn;
-  byId("logout").hidden = !signedIn;
+  byId("account-menu").hidden = !signedIn;
   if (signedIn) return;
   state.assets = [];
+  state.permissions.clear();
+  state.panel = null;
+  byId("account-menu").open = false;
+  byId("account-name").textContent = "";
+  byId("edit-dialog").close();
   stopAudio();
   stopPreview();
-  for (const id of ["asset-list", "theme-list", "preset-list", "import-detail", "json-content"]) {
+  for (const id of ["asset-list", "theme-list", "preset-list", "member-list", "account-list", "role-list", "import-detail", "json-content"]) {
     byId(id).replaceChildren();
   }
   byId("import-result").hidden = true;
@@ -185,13 +191,13 @@ function renderPresets(presets) {
     const { published: ignoredPublished, current: ignoredCurrent, ...editable } = preset;
     editable.status = "draft";
     const controls = [
-      makeButton("试听预设", () => startPreview(preset)),
       makeButton("导出 JSON", () => download(
         new Blob([JSON.stringify(editable, null, 2) + "\n"], { type: "application/json" }),
         preset.preset_id + "-r" + preset.revision + ".json"
       ))
     ];
-    if (!published && (currentRevision == null || preset.revision > currentRevision)) controls.push(makeButton("发布", async () => {
+    if (can("assets.read")) controls.unshift(makeButton("试听预设", () => startPreview(preset)));
+    if (can("presets.publish") && !published && (currentRevision == null || preset.revision > currentRevision)) controls.push(makeButton("发布", async () => {
       if (!window.confirm("发布 " + preset.preset_id + " 的版本 " + preset.revision + "？")) return;
       await api(presetPath(preset) + "/publish", { method: "POST" });
       await refreshPresets();
@@ -221,12 +227,65 @@ async function refreshPresets() {
   renderPresets(items(await api("/admin/presets"), "presets"));
 }
 
-async function loadWorkspace() {
-  await refreshAssets();
-  setSignedIn(true);
-  await Promise.all([refreshThemes(), refreshPresets()]);
+const permissionLabels = {
+  "assets.read": "查看、试听和导出素材",
+  "assets.write": "导入素材",
+  "themes.read": "查看主题",
+  "themes.write": "创建主题",
+  "presets.read": "查看和导出预设",
+  "presets.write": "导入预设",
+  "presets.publish": "发布预设",
+  "members.manage": "管理 App 会员",
+  "accounts.manage": "管理后台账号",
+  "roles.manage": "管理角色"
+};
+
+const navigation = [
+  ["assets-panel", refreshAssets],
+  ["themes-panel", refreshThemes],
+  ["presets-panel", refreshPresets],
+  ["members-panel", refreshMembers],
+  ["accounts-panel", refreshAccounts],
+  ["roles-panel", refreshRoles]
+];
+const menuLinks = Array.from(document.querySelectorAll(".sidebar nav a"));
+const can = (permission) => state.permissions.has(permission);
+
+async function showPanel() {
+  if (!state.signedIn) return;
+  const available = menuLinks.filter((link) => !link.hidden);
+  const selected = available.find((link) => link.hash === location.hash) ?? available[0];
+  const panel = selected?.hash.slice(1) ?? "empty-panel";
+  if (state.panel === panel) return;
+  state.panel = panel;
+  stopAudio();
+  stopPreview();
+  for (const [id] of navigation) byId(id).hidden = id !== panel;
+  byId("empty-panel").hidden = panel !== "empty-panel";
+  for (const link of menuLinks) {
+    if (link === selected) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  }
+  report("");
+  const entry = navigation.find(([id]) => id === panel);
+  if (entry) await entry[1]();
 }
 
+async function loadWorkspace() {
+  const identity = await api("/admin/me");
+  state.permissions = new Set(identity.permissions);
+  byId("account-name").textContent = identity.username;
+  for (const element of document.querySelectorAll("[data-permission]")) {
+    element.hidden = !can(element.dataset.permission);
+  }
+  byId("content-nav-heading").hidden = !["assets.read", "themes.read", "presets.read"].some(can);
+  byId("members-nav-heading").hidden = !can("members.manage");
+  byId("system-nav-heading").hidden = !can("accounts.manage") && !can("roles.manage");
+  setSignedIn(true);
+  await showPanel();
+}
+
+window.addEventListener("hashchange", () => showPanel().catch((error) => report(error.message, true)));
 function onSubmit(form, action) {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -366,6 +425,7 @@ async function startPreview(preset) {
   byId("preview-controls").hidden = false;
   try {
     await preview.context.resume();
+    if (!state.assets.length) await refreshAssets();
     const hashes = [...new Set(preset.tracks.flatMap((track) => track.clips.map((clip) => clip.sha256)))];
     const audio = new Map(await Promise.all(hashes.map(async (hash) => [hash, await loadPreviewClip(hash, preview)])));
     if (state.preview !== preview) return;
@@ -386,3 +446,223 @@ byId("stop-preview").addEventListener("click", stopPreview);
 loadWorkspace().catch((error) => {
   if (error.status !== 401) report(error.message, true);
 });
+
+const editDialog = byId("edit-dialog");
+const editForm = byId("edit-form");
+let submitEdit;
+
+function openEditor(title, fields, action) {
+  byId("edit-title").textContent = title;
+  byId("edit-fields").replaceChildren(...fields);
+  byId("edit-error").textContent = "";
+  byId("edit-error").hidden = true;
+  submitEdit = action;
+  editDialog.showModal();
+}
+
+editDialog.addEventListener("close", () => {
+  byId("edit-fields").replaceChildren();
+  submitEdit = undefined;
+});
+
+editForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!submitEdit) return;
+  const button = editForm.querySelector("button[type=submit]");
+  const errorNode = byId("edit-error");
+  button.disabled = true;
+  errorNode.hidden = true;
+  try {
+    await submitEdit(new FormData(editForm));
+    if (editDialog.open) editDialog.close();
+  } catch (error) {
+    const invalidCurrent = error.message === "invalid_credentials" || error.message === "invalid_current_password";
+    errorNode.textContent = invalidCurrent ? "当前密码不正确" : error.message;
+    errorNode.hidden = false;
+  } finally {
+    for (const field of editForm.querySelectorAll('input[type="password"]')) field.value = "";
+    button.disabled = false;
+  }
+});
+
+function field(caption, name, {value = "", type = "text", autocomplete, maximum, minimum} = {}) {
+  const label = document.createElement("label");
+  label.textContent = caption;
+  const input = document.createElement("input");
+  input.name = name;
+  input.type = type;
+  input.value = value;
+  input.required = true;
+  if (autocomplete) input.autocomplete = autocomplete;
+  if (maximum) input.maxLength = maximum;
+  if (minimum) input.minLength = minimum;
+  label.append(input);
+  return label;
+}
+
+function newPassword(caption, name = "password") {
+  return field(caption, name, {type: "password", autocomplete: "new-password", maximum: 72});
+}
+
+function roleField(roles, selected) {
+  const label = document.createElement("label");
+  label.textContent = "角色";
+  const select = document.createElement("select");
+  select.name = "role_id";
+  select.required = true;
+  for (const role of roles) {
+    const option = new Option(role.name, role.id);
+    option.selected = String(selected) === String(role.id);
+    select.add(option);
+  }
+  label.append(select);
+  return label;
+}
+
+function permissionsField(values) {
+  const fieldset = document.createElement("fieldset");
+  fieldset.className = "permissions";
+  const legend = document.createElement("legend");
+  legend.textContent = "权限";
+  fieldset.append(legend);
+  for (const [permission, caption] of Object.entries(permissionLabels)) {
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.name = "permissions";
+    checkbox.value = permission;
+    checkbox.checked = values.includes(permission);
+    label.append(checkbox, caption);
+    fieldset.append(label);
+  }
+  return fieldset;
+}
+
+function verifyPassword(data, name) {
+  if (data.get(name) !== data.get("confirm_password")) throw new Error("两次输入的新密码不一致");
+}
+
+byId("open-password").addEventListener("click", () => {
+  byId("account-menu").open = false;
+  openEditor("修改密码", [
+    field("当前密码", "current_password", {type: "password", autocomplete: "current-password"}),
+    newPassword("新密码", "new_password"),
+    newPassword("确认新密码", "confirm_password")
+  ], async (data) => {
+    verifyPassword(data, "new_password");
+    await api("/admin/password", sendJson("POST", {
+      current_password: data.get("current_password"), new_password: data.get("new_password")
+    }));
+    setSignedIn(false);
+    loginForm.elements.username.focus();
+    report("密码已修改，请用新密码重新登录");
+  });
+});
+
+async function listRoles() {
+  return items(await api("/admin/roles"), "roles");
+}
+
+function openRole(role = null) {
+  openEditor(role ? "编辑角色" : "新建角色", [
+    field("角色名称", "name", {value: role?.name, maximum: 96}),
+    permissionsField(role?.permissions ?? [])
+  ], async (data) => {
+    const route = role ? "/admin/roles/" + encodeURIComponent(role.id) : "/admin/roles";
+    await api(route, sendJson(role ? "PUT" : "POST", {
+      name: data.get("name").trim(), permissions: data.getAll("permissions")
+    }));
+    await refreshRoles();
+    report("角色已保存");
+  });
+}
+
+async function refreshRoles() {
+  renderRows("role-list", await listRoles(), (role) => [
+    role.name,
+    role.permissions.map((name) => permissionLabels[name] ?? name).join("、") || "无",
+    role.builtin ? "内置角色" : makeButton("编辑", () => openRole(role))
+  ], 3);
+}
+
+byId("create-role").addEventListener("click", () => openRole());
+
+async function openAccount(account = null) {
+  const roles = await listRoles();
+  const fields = account ? [] : [
+    field("用户名", "username", {autocomplete: "off", maximum: 96}),
+    newPassword("初始密码")
+  ];
+  fields.push(roleField(roles, account?.role_id));
+  openEditor(account ? "分配角色 · " + account.username : "新增后台账号", fields, async (data) => {
+    const role_id = Number(data.get("role_id"));
+    if (account) {
+      await api("/admin/accounts/" + encodeURIComponent(account.id), sendJson("PUT", {
+        enabled: account.enabled, role_id
+      }));
+    } else {
+      await api("/admin/accounts", sendJson("POST", {
+        username: data.get("username").trim(), password: data.get("password"), role_id
+      }));
+    }
+    await refreshAccounts();
+    report("后台账号已保存");
+  });
+}
+
+function toggleStatus(path, account, extra, refresh) {
+  const label = account.enabled ? "停用" : "启用";
+  return makeButton(label, async () => {
+    if (!window.confirm(label + " " + account.username + "？")) return;
+    await api(path + "/" + encodeURIComponent(account.id), sendJson("PUT", {
+      ...extra, enabled: !account.enabled
+    }));
+    await refresh();
+    report(account.username + " 已" + label);
+  });
+}
+
+async function refreshAccounts() {
+  const [accounts, roles] = await Promise.all([api("/admin/accounts"), listRoles()]);
+  const names = new Map(roles.map((role) => [String(role.id), role.name]));
+  renderRows("account-list", items(accounts, "accounts"), (account) => [
+    account.username,
+    names.get(String(account.role_id)) ?? "—",
+    account.enabled ? "启用" : "停用",
+    actions(
+      makeButton("分配角色", () => openAccount(account)),
+      toggleStatus("/admin/accounts", account, {role_id: account.role_id}, refreshAccounts)
+    )
+  ], 4);
+}
+
+byId("create-account").addEventListener("click", () => run(byId("create-account"), () => openAccount()));
+
+async function refreshMembers() {
+  renderRows("member-list", items(await api("/admin/members"), "members"), (member) => [
+    member.username,
+    member.enabled ? "启用" : "停用",
+    actions(
+      makeButton("重置密码", () => openEditor("重置密码 · " + member.username, [
+        newPassword("新密码"), newPassword("确认新密码", "confirm_password")
+      ], async (data) => {
+        verifyPassword(data, "password");
+        await api("/admin/members/" + encodeURIComponent(member.id) + "/password",
+          sendJson("POST", {password: data.get("password")}));
+        report("会员密码已重置");
+      })),
+      toggleStatus("/admin/members", member, {}, refreshMembers)
+    )
+  ], 3);
+}
+
+byId("create-member").addEventListener("click", () => openEditor("新增会员", [
+  field("App 用户名", "username", {autocomplete: "off", maximum: 96}),
+  newPassword("初始密码")
+], async (data) => {
+  await api("/admin/members", sendJson("POST", {
+    username: data.get("username").trim(), password: data.get("password")
+  }));
+  await refreshMembers();
+  report("会员已创建");
+}));

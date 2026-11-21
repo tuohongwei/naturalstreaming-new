@@ -5,13 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>NaturalStreaming 管理后台</title>
-  <link rel="stylesheet" href="/phase1-console.css">
-  <script src="/phase1-console.js" defer></script>
+  <link rel="stylesheet" href="/phase1-console-v2.css">
+  <script src="/phase1-console-v2.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">NaturalStreaming <span>管理后台</span></div>
-    <button id="logout" class="secondary" type="button" hidden>退出登录</button>
+    <details id="account-menu" class="account-menu" hidden>
+      <summary><span id="account-name"></span></summary>
+      <div class="account-actions">
+        <button id="open-password" class="secondary" type="button">修改密码</button>
+        <button id="logout" class="secondary" type="button">退出登录</button>
+      </div>
+    </details>
   </header>
   <main>
     <section id="login-panel" class="panel login-panel" aria-labelledby="login-title">
@@ -25,17 +31,26 @@
 
     <div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
     <div id="workspace" hidden>
-      <nav aria-label="管理菜单">
-        <a href="#assets-panel">素材库</a>
-        <a href="#themes-panel">主题</a>
-        <a href="#presets-panel">预设</a>
-      </nav>
+      <aside class="sidebar">
+        <nav aria-label="管理菜单">
+          <p id="content-nav-heading">内容管理</p>
+          <a href="#assets-panel" data-permission="assets.read">素材库</a>
+          <a href="#themes-panel" data-permission="themes.read">主题</a>
+          <a href="#presets-panel" data-permission="presets.read">预设</a>
+          <p id="members-nav-heading">用户管理</p>
+          <a href="#members-panel" data-permission="members.manage">会员管理</a>
+          <p id="system-nav-heading">系统管理</p>
+          <a href="#accounts-panel" data-permission="accounts.manage">后台账号</a>
+          <a href="#roles-panel" data-permission="roles.manage">角色管理</a>
+        </nav>
+      </aside>
+      <div class="module-content">
       <section id="assets-panel" class="panel" aria-labelledby="assets-title">
         <div class="section-heading">
           <h1 id="assets-title">素材库</h1>
           <button id="export-assets" class="secondary" type="button">导出素材目录</button>
         </div>
-        <form id="asset-import" class="inline-form">
+        <form id="asset-import" data-permission="assets.write" class="inline-form">
           <label>音频素材 ZIP <input name="file" type="file" accept=".zip,application/zip" required></label>
           <button type="submit">批量导入</button>
         </form>
@@ -55,7 +70,7 @@
 
       <section id="themes-panel" class="panel" aria-labelledby="themes-title">
         <h2 id="themes-title">主题</h2>
-        <form id="theme-create" class="inline-form">
+        <form id="theme-create" data-permission="themes.write" class="inline-form">
           <label>主题 ID <input name="id" placeholder="coastal-home" required></label>
           <label>主题名称 <input name="name" placeholder="海岸的家" required></label>
           <button type="submit">创建主题</button>
@@ -70,7 +85,7 @@
 
       <section id="presets-panel" class="panel" aria-labelledby="presets-title">
         <h2 id="presets-title">预设</h2>
-        <form id="preset-import" class="inline-form">
+        <form id="preset-import" data-permission="presets.write" class="inline-form">
           <label>播放预设 JSON <input name="file" type="file" accept=".json,application/json" required></label>
           <button type="submit">导入草稿</button>
         </form>
@@ -86,8 +101,63 @@
           </table>
         </div>
       </section>
+        <section id="members-panel" class="panel" aria-labelledby="members-title" hidden>
+          <div class="section-heading">
+            <h2 id="members-title">会员管理</h2>
+            <button id="create-member" type="button">新增会员</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">App 账号</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
+              <tbody id="member-list"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="accounts-panel" class="panel" aria-labelledby="accounts-title" hidden>
+          <div class="section-heading">
+            <h2 id="accounts-title">后台账号</h2>
+            <button id="create-account" type="button">新增后台账号</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">用户名</th><th scope="col">角色</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
+              <tbody id="account-list"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="roles-panel" class="panel" aria-labelledby="roles-title" hidden>
+          <div class="section-heading">
+            <h2 id="roles-title">角色管理</h2>
+            <button id="create-role" type="button">新建角色</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">角色</th><th scope="col">权限</th><th scope="col">操作</th></tr></thead>
+              <tbody id="role-list"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="empty-panel" class="panel" hidden>
+          <h2>暂无可用模块</h2>
+          <p>请联系后台管理员分配权限。</p>
+        </section>
+      </div>
     </div>
   </main>
+  <dialog id="edit-dialog" aria-labelledby="edit-title">
+    <div class="section-heading">
+      <h2 id="edit-title"></h2>
+      <form method="dialog"><button class="secondary" type="submit">取消</button></form>
+    </div>
+    <p id="edit-error" role="alert" class="feedback error" hidden></p>
+    <form id="edit-form" class="stack-form">
+      <div id="edit-fields" class="stack-form"></div>
+      <button type="submit">保存</button>
+    </form>
+  </dialog>
   <dialog id="json-dialog" aria-labelledby="json-title">
     <div class="section-heading">
       <h2 id="json-title">JSON</h2>

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
 import {readFileSync, writeFileSync} from 'node:fs'
+import {setTimeout as sleep} from 'node:timers/promises'
 
 const admin = 'https://admin.naturalstreaming.net'
 const api = 'https://api.naturalstreaming.net'
@@ -11,7 +12,12 @@ const docs = JSON.parse(readFileSync('.local/phase1-sample-presets.json', 'utf8'
 docs.sort((a,b) => a.revision - b.revision)
 
 async function request(url, options, status = 200) {
-    const response = await fetch(url, options)
+    let response = await fetch(url, options)
+    for (let retry = 0; response.status === 429 && retry < 5; retry++) {
+        await response.body?.cancel()
+        await sleep(6500)
+        response = await fetch(url, options)
+    }
     if (response.status !== status) {
         const error = (await response.text()).slice(0, 350)
         throw new Error(url + ' returned ' + response.status + ', expected ' + status + ': ' + error)

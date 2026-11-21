@@ -22,7 +22,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class Sessions implements ApplicationRunner {
     private record Account(long id, String password) {}
-    private record Session(boolean revoked, boolean expired) {}
+    public record Principal(long id, String username) {}
+    private record Session(Principal principal, boolean revoked, boolean expired) {}
 
     private final JdbcTemplate sql;
     private final Environment environment;
@@ -47,9 +48,9 @@ public class Sessions implements ApplicationRunner {
         String password = environment.getProperty(passwordKey);
         if (username == null || password == null) return;
         sql.update("""
-            INSERT INTO ns_account(username,password_hash,role) VALUES (?,?,?)
+            INSERT INTO ns_account(username,password_hash,role,console_role_id) VALUES (?,?,?,?)
             ON DUPLICATE KEY UPDATE id=id
-            """, username, passwords.encode(password), role);
+            """, username, passwords.encode(password), role, "admin".equals(role) ? 1L : null);
     }
 
     @Transactional
@@ -61,7 +62,7 @@ public class Sessions implements ApplicationRunner {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid_credentials");
         }
         var accounts = sql.query("""
-            SELECT id,password_hash FROM ns_account WHERE username=? AND role=? FOR UPDATE
+            SELECT id,password_hash FROM ns_account WHERE username=? AND role=? AND enabled=TRUE FOR UPDATE
             """, (row, index) -> new Account(row.getLong(1), row.getString(2)), username, role);
         var account = accounts.isEmpty() ? null : accounts.getFirst();
         boolean matches = passwords.matches(password, account == null ? dummyPassword : account.password());
@@ -81,19 +82,46 @@ public class Sessions implements ApplicationRunner {
         return token;
     }
 
-    public void require(String role, String token) {
+    public Principal require(String role, String token) {
+        return require(role, token, false);
+    }
+
+    private Principal require(String role, String token, boolean lockSession) {
         if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "unauthorized");
         }
         var sessions = sql.query("""
-            SELECT s.revoked,s.expires_at<=UTC_TIMESTAMP(6)
+            SELECT a.id,a.username,(s.revoked OR NOT a.enabled),s.expires_at<=UTC_TIMESTAMP(6)
             FROM ns_session s JOIN ns_account a ON a.id=s.account_id
             WHERE s.token_hash=? AND a.role=?
-            """, (row, index) -> new Session(row.getBoolean(1), row.getBoolean(2)), hash(token), role);
+            """ + (lockSession ? " FOR UPDATE" : ""), (row, index) -> new Session(new Principal(row.getLong(1), row.getString(2)), row.getBoolean(3), row.getBoolean(4)), hash(token), role);
         if (sessions.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "unauthorized");
         var session = sessions.getFirst();
         if (session.revoked()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "session_revoked");
         if (session.expired()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "session_expired");
+        return session.principal();
+    }
+
+    @Transactional
+    public void changeConsolePassword(String token, Map<String, String> request) {
+        String current = request.get("current_password");
+        String next = request.get("new_password");
+        ConsoleDirectory.validatePassword(next);
+        if (current == null || current.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_current_password");
+        }
+        if (current.equals(next)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_new_password");
+        }
+        Principal principal = require("admin", token);
+        String hash = sql.queryForObject("SELECT password_hash FROM ns_account WHERE id=? FOR UPDATE",
+            String.class, principal.id());
+        require("admin", token, true);
+        if (!passwords.matches(current, hash)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_current_password");
+        }
+        sql.update("UPDATE ns_account SET password_hash=? WHERE id=?", passwords.encode(next), principal.id());
+        sql.update("UPDATE ns_session SET revoked=TRUE WHERE account_id=? AND revoked=FALSE", principal.id());
     }
 
     public void logout(String role, String token) {
